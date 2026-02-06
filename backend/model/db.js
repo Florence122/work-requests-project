@@ -8,6 +8,8 @@ const db = new sqlite3.Database("./database.sqlite", (err) => {
   }
 });
 
+db.run("PRAGMA foreign_keys = ON");
+
 // Create User table
 db.run(`
   CREATE TABLE IF NOT EXISTS users (
@@ -47,7 +49,5 @@ db.run(`
     console.log("Tasks table ready");
   }
 });
-
-db.run()
 
 module.exports = db;

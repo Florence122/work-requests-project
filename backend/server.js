@@ -1,13 +1,12 @@
 const express = require("express");
-const userRoutes = require("./Routes/userRoutes")
-const taskRoutes = require("./Routes/taskRoutes")
-
 const app = express();
 app.use(express.json());
+require('dotenv').config();
 
-
+const userRoutes = require("./Routes/userRoutes")
 app.use("/users", userRoutes);
-app.use("/tasks", taskRoutes);
+// const taskRoutes = require("./Routes/taskRoutes")
+// app.use("/tasks", taskRoutes);
 
 const PORT = 3001;
 app.listen(PORT, (err) => {

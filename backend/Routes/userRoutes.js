@@ -3,6 +3,7 @@ const db = require("../model/db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const requireAdmin =require('../middlewares/requireAuth')
+require('dotenv').config();
 
 const router = express.Router();
 
@@ -11,11 +12,11 @@ const SALT_ROUNDS = 10;
 
 /**
  * CREATE user/admin
- * POST /users
+ * POST /users/register
  * Admin-only
  */
 
-router.post("/", requireAdmin, async (req, res) => {
+router.post("/register", requireAdmin, async (req, res) => {
     const { username, email, role, password } = req.body;
 
     if (!username || !email || !role || !password) {
@@ -73,7 +74,7 @@ router.post("/login",  (req, res) => {
  * GET /users
  * Admin-only
  */
-router.get("/", requireAdmin, (req, res) => {
+router.get("/", requireAdmin,  (req, res) => {
     const sql = "SELECT id, username, email, role FROM users"; // Never send password hashes
     db.all(sql, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -83,10 +84,10 @@ router.get("/", requireAdmin, (req, res) => {
 
 /**
  * GET single user/admin by ID
- * GET /users/:id
+ * GET /users/byId/:id
  * Admin-only
  */
-router.get("/:id", requireAdmin, (req, res) => {
+router.get("/byID/:id", requireAdmin, (req, res) => {
     const sql = "SELECT id, username, email, role FROM users WHERE id = ?";
     
     db.get(sql, [req.params.id], (err, row) => {
@@ -98,10 +99,10 @@ router.get("/:id", requireAdmin, (req, res) => {
 
 /**
  * UPDATE user/admin
- * PUT /users/:id
+ * PUT /users/update/:id
  * Admin-only
  */
-router.put("/:id", requireAdmin, async (req, res) => {
+router.put("/update/:id", requireAdmin, async (req, res) => {
     const { username, email, role } = req.body;
 
     if (!username || !email || !role) {
@@ -127,7 +128,7 @@ router.put("/:id", requireAdmin, async (req, res) => {
  * DELETE /users/:id
  * Admin-only
  */
-router.delete("/:id", requireAdmin, (req, res) => {
+router.delete("/delete/:id", (req, res) => {
     const sql = "DELETE FROM users WHERE id = ?";
     db.run(sql, [req.params.id], function (err) {
         if (err) return res.status(500).json({ error: err.message });
