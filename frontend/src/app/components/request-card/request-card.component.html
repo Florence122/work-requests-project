@@ -1,35 +1,69 @@
-<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-6 hover:shadow-md transition-shadow">
-  <div class="flex justify-between items-start mb-3">
-    <div>
-      <h3 class="text-lg font-semibold text-gray-900">
-        <a [routerLink]="['/requests', request.id]" class="hover:text-blue-600">
+<div class="request-card group">
+  <div class="flex justify-between items-start mb-4">
+    <div class="flex-1 min-w-0">
+      <h3 class="text-lg font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors mb-1">
+        <a [routerLink]="['/requests', request.id]" class="hover:underline">
           {{ request.title }}
         </a>
       </h3>
-      <p class="text-sm text-gray-500 mt-1">Created: {{ request.createdDate | date }}</p>
+      <div class="flex items-center gap-3 text-sm text-gray-500">
+        <span>#{{ request.id }}</span>
+        <span>•</span>
+        <span>Created: {{ request.createdDate | date:'MMM d' }}</span>
+        @if (request.lastUpdated) {
+          <span>•</span>
+          <span class="flex items-center gap-1">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Updated: {{ request.lastUpdated | date:'MMM d' }}
+          </span>
+        }
+      </div>
     </div>
-    <div class="flex space-x-2">
-      <span class="px-3 py-1 rounded-full text-xs font-medium {{ priorityColor }}">
+    <div class="flex flex-col gap-1">
+      <span class="px-3 py-1 rounded-full text-xs font-semibold {{ priorityColor }}">
         {{ request.priority }}
       </span>
-      <span class="px-3 py-1 rounded-full text-xs font-medium {{ statusColor }}">
+      <span class="px-3 py-1 rounded-full text-xs font-semibold {{ statusColor }}">
         {{ request.status }}
       </span>
     </div>
   </div>
   
-  <p class="text-gray-700 mb-4 line-clamp-2">{{ request.description }}</p>
+  <p class="text-gray-600 mb-5 line-clamp-2 text-sm leading-relaxed">
+    {{ request.description }}
+  </p>
   
-  <div class="flex justify-between items-center">
-    <div class="text-sm text-gray-600">
+  <div class="flex items-center justify-between pt-4 border-t border-gray-100">
+    <div class="flex items-center gap-2">
       @if (request.assignedAgentName) {
-        <span>Assigned to: {{ request.assignedAgentName }}</span>
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+            <span class="text-blue-600 font-semibold text-sm">
+              {{ request.assignedAgentName.charAt(0) }}
+            </span>
+          </div>
+          <span class="text-sm text-gray-700">{{ request.assignedAgentName }}</span>
+        </div>
       } @else {
-        <span class="text-gray-400">Unassigned</span>
+        <div class="flex items-center gap-2 text-gray-400">
+          <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+            <span class="text-gray-500">—</span>
+          </div>
+          <span class="text-sm">Unassigned</span>
+        </div>
       }
     </div>
-    <a [routerLink]="['/requests', request.id]" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-      View Details →
+    
+    <a 
+      [routerLink]="['/requests', request.id]" 
+      class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium text-sm group-hover:gap-2 transition-all"
+    >
+      View Details
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+      </svg>
     </a>
   </div>
 </div>
