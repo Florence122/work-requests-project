@@ -1,0 +1,35 @@
+<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-6 hover:shadow-md transition-shadow">
+  <div class="flex justify-between items-start mb-3">
+    <div>
+      <h3 class="text-lg font-semibold text-gray-900">
+        <a [routerLink]="['/requests', request.id]" class="hover:text-blue-600">
+          {{ request.title }}
+        </a>
+      </h3>
+      <p class="text-sm text-gray-500 mt-1">Created: {{ request.createdDate | date }}</p>
+    </div>
+    <div class="flex space-x-2">
+      <span class="px-3 py-1 rounded-full text-xs font-medium {{ priorityColor }}">
+        {{ request.priority }}
+      </span>
+      <span class="px-3 py-1 rounded-full text-xs font-medium {{ statusColor }}">
+        {{ request.status }}
+      </span>
+    </div>
+  </div>
+  
+  <p class="text-gray-700 mb-4 line-clamp-2">{{ request.description }}</p>
+  
+  <div class="flex justify-between items-center">
+    <div class="text-sm text-gray-600">
+      @if (request.assignedAgentName) {
+        <span>Assigned to: {{ request.assignedAgentName }}</span>
+      } @else {
+        <span class="text-gray-400">Unassigned</span>
+      }
+    </div>
+    <a [routerLink]="['/requests', request.id]" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+      View Details →
+    </a>
+  </div>
+</div>

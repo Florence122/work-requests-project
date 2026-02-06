@@ -1,0 +1,44 @@
+<div class="min-h-screen bg-gray-50 p-6">
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex justify-between items-center">
+      <h1 class="text-3xl font-bold text-gray-900">Work Requests</h1>
+      <app-user-selector></app-user-selector>
+    </div>
+    <p class="text-gray-600 mt-2">Manage all work requests in one place</p>
+  </div>
+
+  <!-- Create Request Button -->
+  <div class="mb-6">
+    <button 
+      class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow transition duration-200"
+      *ngIf="authService.isAdmin()"
+      routerLink="/requests"
+      [queryParams]="{ create: 'true' }"
+    >
+      ➕ Create New Request
+    </button>
+  </div>
+
+  <!-- Requests List -->
+  <div class="bg-white rounded-lg shadow">
+    <div class="p-6 border-b border-gray-200">
+      <h2 class="text-xl font-semibold text-gray-800">
+        Requests ({{ requests.length }})
+      </h2>
+    </div>
+    <div class="p-6">
+      @if (requests.length === 0) {
+        <div class="text-center py-8 text-gray-500">
+          No requests found. Create your first request!
+        </div>
+      } @else {
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          @for (request of requests; track request.id) {
+            <app-request-card [request]="request"></app-request-card>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</div>

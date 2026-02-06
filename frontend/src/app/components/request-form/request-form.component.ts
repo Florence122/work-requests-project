@@ -1,6 +1,7 @@
 import { Component, EventEmitter, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RequestService } from '../../services/request.service';
 
 @Component({
   selector: 'app-request-form',
@@ -18,13 +19,35 @@ export class RequestFormComponent {
   priority = 'Medium';
   status = 'Open';
 
+  constructor(private requestService: RequestService) {}
+
   onSubmit(): void {
-    console.log('Request created:', { 
-      title: this.title, 
+    if (!this.title.trim() || !this.description.trim()) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    const newRequest = {
+      title: this.title,
       description: this.description,
-      priority: this.priority,
-      status: this.status
-    });
+      priority: this.priority as any,
+      status: this.status as any
+    };
+
+    this.requestService.createRequest(newRequest);
     this.requestCreated.emit();
+    this.resetForm();
+  }
+
+  resetForm(): void {
+    this.title = '';
+    this.description = '';
+    this.priority = 'Medium';
+    this.status = 'Open';
+  }
+
+  onCancel(): void {
+    this.cancel.emit();
+    this.resetForm();
   }
 }
