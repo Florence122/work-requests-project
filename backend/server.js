@@ -1,11 +1,19 @@
 const express = require("express");
-const userRoutes = require("./Routes/userRoute")
 const app = express();
 app.use(express.json());
+require('dotenv').config();
 
+const userRoutes = require("./Routes/userRoutes")
 app.use("/users", userRoutes);
+// const taskRoutes = require("./Routes/taskRoutes")
+// app.use("/tasks", taskRoutes);
 
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+const PORT = 3001;
+app.listen(PORT, (err) => {
+  if (err) {
+    console.error("Failed to start server:", err);
+  } else {
+    console.log(`Server running on http://localhost:${PORT}`);
+  }
 });
+
