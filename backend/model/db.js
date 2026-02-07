@@ -17,7 +17,7 @@ db.run(`
     username TEXT NOT NULL,
     email TEXT NOT NULL,
     password TEXT NOT NULL,
-    role TEXT CHECK(role IN ('user','admin')) NOT NULL
+    role TEXT CHECK(role IN ('Agent','Admin')) NOT NULL
   )
 `, (err) => {
   if (err) {
@@ -30,17 +30,26 @@ db.run(`
 //Create Task Table
 db.run(`
   CREATE TABLE IF NOT EXISTS tasks (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  title TEXT NOT NULL,
-  description TEXT,
-  status TEXT CHECK(status IN ('open', 'in_progress', 'done')) DEFAULT 'open',
-  priority TEXT CHECK(priority IN ('low', 'mid', 'high')) DEFAULT 'mid',
-  assigned_to INTEGER NOT NULL,
-  created_by INTEGER NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
 
-  FOREIGN KEY (assigned_to) REFERENCES users(id),
-  FOREIGN KEY (created_by) REFERENCES users(id)
+    status TEXT CHECK (
+      status IN ('open', 'in_progress', 'done')
+    ) DEFAULT 'open',
+
+    priority TEXT CHECK (
+      priority IN ('low', 'mid', 'high')
+    ) DEFAULT 'mid',
+
+    created_by INTEGER NOT NULL,   -- admin
+    assigned_to INTEGER,           -- agent (user)
+
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (assigned_to) REFERENCES users(id)
   )
 `, (err) => {
   if (err) {
