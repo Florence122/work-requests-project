@@ -182,4 +182,61 @@ router.put("/:id/assign", requireAuth, requireAdmin, (req, res) => {
   });
 });
 
+/**
+ * START / COMPLETE TASK (AGENT ONLY)
+ * PUT /tasks/:id/progress
+ */
+router.put("/:id/progress", requireAuth, (req, res) => {
+  const { status } = req.body;
+
+  if (!["in_progress", "done"].includes(status)) {
+    return res.status(400).json({ message: "Invalid status" });
+  }
+
+  const getTaskSql = `
+    SELECT status FROM tasks
+    WHERE id = ? AND assigned_to = ?
+  `;
+
+  db.get(getTaskSql, [req.params.id, req.user.id], (err, task) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!task) {
+      return res.status(403).json({ message: "Task not assigned to you" });
+    }
+
+    if (task.status === "open" && status !== "in_progress") {
+      return res.status(400).json({
+        message: "Task must be in_progress before done"
+      });
+    }
+
+    if (task.status === "in_progress" && status !== "done") {
+      return res.status(400).json({
+        message: "Task already in progress"
+      });
+    }
+
+    if (task.status === "done") {
+      return res.status(400).json({
+        message: "Task already completed"
+      });
+    }
+
+    const updateSql = `
+      UPDATE tasks
+      SET status = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND assigned_to = ?
+    `;
+
+    db.run(
+      updateSql,
+      [status, req.params.id, req.user.id],
+      function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: `Task moved to ${status}` });
+      }
+    );
+  });
+});
+
 module.exports = router;
