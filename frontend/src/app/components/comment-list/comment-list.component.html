@@ -1,0 +1,19 @@
+<div class="space-y-4">
+  <h3 class="text-lg font-semibold text-gray-900 mb-4">Comments</h3>
+  
+  @if (comments.length === 0) {
+    <div class="text-center py-8 text-gray-500 border border-dashed border-gray-300 rounded-lg">
+      No comments yet. Be the first to comment!
+    </div>
+  } @else {
+    @for (comment of comments; track comment.id) {
+      <div class="border border-gray-200 rounded-lg p-4">
+        <div class="flex justify-between items-start mb-2">
+          <div class="font-medium text-gray-900">{{ comment.userName }}</div>
+          <div class="text-sm text-gray-500">{{ comment.createdAt | date:'short' }}</div>
+        </div>
+        <p class="text-gray-700">{{ comment.content }}</p>
+      </div>
+    }
+  }
+</div>
