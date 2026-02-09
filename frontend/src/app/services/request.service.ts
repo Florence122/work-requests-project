@@ -1,134 +1,99 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
+import { Observable, tap } from 'rxjs';
+import { TaskService } from './task.service';
 import { Request, PRIORITY_ORDER } from '../models/request';
 
 @Injectable({
   providedIn: 'root'
 })
 export class RequestService {
-  private requests: Request[] = [
-    {
-      id: 1,
-      title: 'Fix login page issue',
-      description: 'Users cannot login on mobile devices. Need to fix responsive design and touch interactions.',
-      priority: 'High',
-      status: 'Open',
-      createdDate: new Date('2024-02-01T10:30:00'),
-      lastUpdated: new Date('2024-02-06T09:15:00'),
-      assignedAgentName: 'Agent Smith'
-    },
-    {
-      id: 2,
-      title: 'Update API documentation',
-      description: 'API documentation needs to be updated with new endpoints and authentication methods.',
-      priority: 'Low',
-      status: 'Done',
-      createdDate: new Date('2024-01-15T14:20:00'),
-      lastUpdated: new Date('2024-01-20T16:45:00'),
-      assignedAgentName: 'Agent Smith'
-    },
-    {
-      id: 3,
-      title: 'Performance optimization for dashboard',
-      description: 'Improve dashboard loading time by optimizing database queries and implementing caching.',
-      priority: 'Medium',
-      status: 'In Progress',
-      createdDate: new Date('2024-01-25T09:00:00'),
-      lastUpdated: new Date('2024-02-05T11:30:00'),
-      assignedAgentName: 'Agent Smith'
-    },
-    {
-      id: 4,
-      title: 'Implement user notifications',
-      description: 'Add real-time notifications for request updates and comments.',
-      priority: 'High',
-      status: 'Open',
-      createdDate: new Date('2024-02-03T13:45:00'),
-      lastUpdated: new Date('2024-02-04T10:20:00')
-    },
-    {
-      id: 5,
-      title: 'Mobile app UI improvements',
-      description: 'Update the mobile app UI for better user experience and accessibility.',
-      priority: 'Medium',
-      status: 'In Progress',
-      createdDate: new Date('2024-01-30T16:10:00'),
-      lastUpdated: new Date('2024-02-06T08:45:00'),
-      assignedAgentName: 'Agent Smith'
-    },
-    {
-      id: 6,
-      title: 'Database backup automation',
-      description: 'Automate database backup process and implement disaster recovery procedures.',
-      priority: 'Low',
-      status: 'Open',
-      createdDate: new Date('2024-02-02T11:20:00'),
-      lastUpdated: new Date('2024-02-02T11:20:00')
-    }
-  ];
+  // Local cache for faster UI updates
+  private requestsCache = signal<Request[]>([]);
 
+  constructor(private taskService: TaskService) {}
+
+  // Get all requests (with caching)
   getRequests(): Request[] {
-    return [...this.requests];
+    return this.requestsCache();
   }
 
-  getRequestById(id: number): Request | undefined {
-    return this.requests.find(req => req.id === id);
-  }
-
-  createRequest(request: Omit<Request, 'id' | 'createdDate'>): Request {
-    const newRequest: Request = {
-      ...request,
-      id: this.requests.length + 1,
-      createdDate: new Date(),
-      lastUpdated: new Date()
-    };
-    this.requests.push(newRequest);
-    return newRequest;
-  }
-
-  updateRequest(id: number, updates: Partial<Request>): Request | undefined {
-    const index = this.requests.findIndex(req => req.id === id);
-    if (index === -1) return undefined;
-
-    this.requests[index] = {
-      ...this.requests[index],
-      ...updates,
-      lastUpdated: new Date()
-    };
-    return this.requests[index];
-  }
-
-  // Enhanced search with better matching
-  searchRequests(searchTerm: string): Request[] {
-    if (!searchTerm.trim()) return this.requests;
-    
-    const lowerCaseTerm = searchTerm.toLowerCase();
-    
-    return this.requests.filter(req =>
-      req.title.toLowerCase().includes(lowerCaseTerm) ||
-      req.description.toLowerCase().includes(lowerCaseTerm) ||
-      req.status.toLowerCase().includes(lowerCaseTerm) ||
-      req.priority.toLowerCase().includes(lowerCaseTerm)
+  // Load all requests from backend
+  loadRequests(): Observable<Request[]> {
+    return this.taskService.getAllRequests().pipe(
+      tap(requests => {
+        this.requestsCache.set(requests);
+      })
     );
   }
 
-  // Enhanced filtering with multiple criteria
-  filterRequests(filters: {
-    status?: string;
-    priority?: string;
-    assignedAgent?: string;
-  }): Request[] {
-    return this.requests.filter(req => {
-      if (filters.status && req.status !== filters.status) return false;
-      if (filters.priority && req.priority !== filters.priority) return false;
-      if (filters.assignedAgent) {
-        if (filters.assignedAgent === 'unassigned' && req.assignedAgentName) return false;
-        if (filters.assignedAgent === 'assigned' && !req.assignedAgentName) return false;
-      }
-      return true;
-    });
+  // Get request by ID from cache
+  getRequestById(id: number): Request | undefined {
+    return this.requestsCache().find(req => req.id === id);
   }
 
-  // Sorting methods
+  // Load single request from backend
+  loadRequestById(id: number): Observable<Request> {
+    return this.taskService.getRequestById(id).pipe(
+      tap(request => {
+        // Update cache with the single request
+        const index = this.requestsCache().findIndex(r => r.id === id);
+        if (index !== -1) {
+          const updatedCache = [...this.requestsCache()];
+          updatedCache[index] = request;
+          this.requestsCache.set(updatedCache);
+        } else {
+          // Add to cache if not found
+          this.requestsCache.update(requests => [...requests, request]);
+        }
+      })
+    );
+  }
+
+  // Create new request
+  createRequest(request: Omit<Request, 'id' | 'createdDate' | 'lastUpdated'>): Observable<Request> {
+    return this.taskService.createRequest(request).pipe(
+      tap(newRequest => {
+        // Add to cache
+        this.requestsCache.update(requests => [...requests, newRequest]);
+      })
+    );
+  }
+
+  // Update request
+  updateRequest(id: number, updates: Partial<Request>): Observable<Request> {
+    return this.taskService.updateRequest(id, updates).pipe(
+      tap(updatedRequest => {
+        // Update cache
+        this.requestsCache.update(requests => 
+          requests.map(req => req.id === id ? updatedRequest : req)
+        );
+      })
+    );
+  }
+
+  // Search requests (returns Observable from backend)
+  searchRequests(searchTerm: string): Observable<Request[]> {
+    return this.taskService.searchRequests(searchTerm);
+  }
+
+  // Filter requests (returns Observable from backend)
+  filterRequests(filters: { status?: string; priority?: string; assignedAgent?: string }): Observable<Request[]> {
+    // Convert frontend filters to backend format
+    const backendFilters: any = {};
+    
+    if (filters.status) {
+      backendFilters.status = filters.status;
+    }
+    
+    if (filters.priority) {
+      backendFilters.priority = filters.priority;
+    }
+    
+    // Note: Backend doesn't support assignedAgent filter directly
+    return this.taskService.filterRequests(backendFilters);
+  }
+
+  // Sort requests locally (for UI responsiveness)
   sortRequests(requests: Request[], sortBy: string, sortDirection: 'asc' | 'desc' = 'asc'): Request[] {
     const sorted = [...requests];
     
@@ -178,5 +143,47 @@ export class RequestService {
     }
     
     return sorted;
+  }
+
+  // Assign/unassign agent
+  assignAgent(requestId: number, agentId: number | null): Observable<any> {
+    return this.taskService.assignRequest(requestId, agentId).pipe(
+      tap(() => {
+        // Update cache
+        this.requestsCache.update(requests => 
+          requests.map(req => {
+            if (req.id === requestId) {
+              return {
+                ...req,
+                assignedAgentId: agentId ?? undefined,
+                assignedAgentName: agentId ? `Agent ${agentId}` : undefined
+              };
+            }
+            return req;
+          })
+        );
+      })
+    );
+  }
+
+  // Update status (for agent progress)
+  updateStatus(requestId: number, status: 'In Progress' | 'Done'): Observable<any> {
+    return this.taskService.updateRequestStatus(requestId, status).pipe(
+      tap(() => {
+        // Update cache
+        this.requestsCache.update(requests => 
+          requests.map(req => {
+            if (req.id === requestId) {
+              return {
+                ...req,
+                status: status,
+                lastUpdated: new Date()
+              };
+            }
+            return req;
+          })
+        );
+      })
+    );
   }
 }
