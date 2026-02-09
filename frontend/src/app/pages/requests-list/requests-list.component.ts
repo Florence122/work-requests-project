@@ -1,13 +1,12 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
-import { RouterLink, ActivatedRoute, Router } from '@angular/router';
+import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { RequestService } from '../../services/request.service';
 import { AuthService } from '../../services/auth.service';
 import { UserSelectorComponent } from '../../components/user-selector/user-selector.component';
 import { RequestCardComponent } from '../../components/request-card/request-card.component';
 import { RequestFormComponent } from '../../components/request-form/request-form.component';
-import { Request } from '../../models/request';
 
 @Component({
   selector: 'app-requests-list',
@@ -17,8 +16,13 @@ import { Request } from '../../models/request';
   styleUrls: ['./requests-list.component.scss']
 })
 export class RequestsListComponent implements OnInit {
-  // All requests
-  allRequests = signal<Request[]>([]);
+  private requestService = inject(RequestService);
+  public authService = inject(AuthService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+
+  // All requests from cache
+  allRequests = computed(() => this.requestService.getRequests());
   
   // Filter and search state
   searchTerm = signal('');
@@ -30,6 +34,9 @@ export class RequestsListComponent implements OnInit {
   
   // Show/hide create form
   showCreateForm = signal(false);
+  
+  // Loading state
+  isLoading = signal(false);
   
   // Options
   statusOptions = ['Open', 'In Progress', 'Done'];
@@ -47,37 +54,40 @@ export class RequestsListComponent implements OnInit {
   filteredRequests = computed(() => {
     let requests = this.allRequests();
     
-    // Apply search
+    // Apply search filter
     const term = this.searchTerm();
     if (term.trim()) {
-      requests = this.requestService.searchRequests(term);
+      // Filter locally since search is already done on the whole list
+      requests = requests.filter(req =>
+        req.title.toLowerCase().includes(term.toLowerCase()) ||
+        req.description.toLowerCase().includes(term.toLowerCase())
+      );
     }
     
-    // Apply filters
-    const filters = {
-      status: this.selectedStatus() || undefined,
-      priority: this.selectedPriority() || undefined,
-      assignedAgent: this.selectedAssignment() === 'All' ? undefined : this.selectedAssignment()
-    };
+    // Apply status filter
+    if (this.selectedStatus()) {
+      requests = requests.filter(req => req.status === this.selectedStatus());
+    }
     
-    requests = this.requestService.filterRequests(filters);
+    // Apply priority filter
+    if (this.selectedPriority()) {
+      requests = requests.filter(req => req.priority === this.selectedPriority());
+    }
+    
+    // Apply assignment filter
+    if (this.selectedAssignment() === 'Assigned') {
+      requests = requests.filter(req => req.assignedAgentName);
+    } else if (this.selectedAssignment() === 'Unassigned') {
+      requests = requests.filter(req => !req.assignedAgentName);
+    }
     
     // Apply sorting
-    requests = this.requestService.sortRequests(
+    return this.requestService.sortRequests(
       requests,
       this.sortBy(),
       this.sortDirection()
     );
-    
-    return requests;
   });
-
-  constructor(
-    private requestService: RequestService,
-    public authService: AuthService,
-    private route: ActivatedRoute,
-    private router: Router
-  ) {}
 
   ngOnInit(): void {
     // Check URL for create parameter
@@ -87,16 +97,26 @@ export class RequestsListComponent implements OnInit {
       }
     });
     
-    // Load initial data
+    // Load initial data from backend
     this.loadRequests();
   }
 
   loadRequests(): void {
-    this.allRequests.set(this.requestService.getRequests());
+    this.isLoading.set(true);
+    
+    this.requestService.loadRequests().subscribe({
+      next: () => {
+        this.isLoading.set(false);
+      },
+      error: (err) => {
+        console.error('Error loading requests:', err);
+        this.isLoading.set(false);
+      }
+    });
   }
 
   onSearch(): void {
-    // Search is reactive via computed property
+    // Could implement debounced search here
   }
 
   clearFilters(): void {
@@ -118,7 +138,8 @@ export class RequestsListComponent implements OnInit {
 
   onRequestCreated(): void {
     this.showCreateForm.set(false);
-    this.loadRequests();
+    this.loadRequests(); // Reload from backend
+    
     // Clear query params
     this.router.navigate([], {
       relativeTo: this.route,
@@ -128,7 +149,6 @@ export class RequestsListComponent implements OnInit {
 
   cancelCreate(): void {
     this.showCreateForm.set(false);
-    // Clear query params
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {}
@@ -140,7 +160,7 @@ export class RequestsListComponent implements OnInit {
     return option ? option.label : 'Sort';
   }
 
-  // Get counts for filter badges
+  // Helper methods for counts
   getStatusCount(status: string): number {
     return this.allRequests().filter(req => req.status === status).length;
   }

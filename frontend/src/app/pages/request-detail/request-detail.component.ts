@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -16,69 +16,132 @@ import { Request } from '../../models/request';
   styleUrls: ['./request-detail.component.scss']
 })
 export class RequestDetailComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private requestService = inject(RequestService);
+  public authService = inject(AuthService);
+
   request?: Request;
   newComment = '';
+  isLoading = false;
+  error = '';
+
   statusOptions = ['Open', 'In Progress', 'Done'];
   priorityOptions = ['Low', 'Medium', 'High'];
-  
-  constructor(
-    private route: ActivatedRoute,
-    private requestService: RequestService,
-    public authService: AuthService
-  ) {}
 
   ngOnInit(): void {
     const id = Number(this.route.snapshot.paramMap.get('id'));
-    this.request = this.requestService.getRequestById(id);
+    this.loadRequest(id);
   }
 
-  updateStatus(newStatus: string): void {
-    if (!this.request) return;
+  loadRequest(id: number): void {
+    this.isLoading = true;
+    this.error = '';
     
-    this.requestService.updateRequest(this.request.id, { status: newStatus as any });
-    this.request = { ...this.request, status: newStatus as any };
+    // Try to get from cache first
+    const cachedRequest = this.requestService.getRequestById(id);
+    if (cachedRequest) {
+      this.request = cachedRequest;
+      this.isLoading = false;
+    } else {
+      // Load from backend
+      this.requestService.loadRequestById(id).subscribe({
+        next: (request) => {
+          this.request = request;
+          this.isLoading = false;
+        },
+        error: (err) => {
+          this.error = err.message || 'Failed to load request';
+          this.isLoading = false;
+        }
+      });
+    }
   }
 
-  updatePriority(newPriority: string): void {
+  updateStatus(newStatus: 'Open' | 'In Progress' | 'Done'): void {
     if (!this.request) return;
     
-    this.requestService.updateRequest(this.request.id, { priority: newPriority as any });
-    this.request = { ...this.request, priority: newPriority as any };
+    this.isLoading = true;
+    this.requestService.updateRequest(this.request.id, { status: newStatus }).subscribe({
+      next: (updatedRequest) => {
+        this.request = updatedRequest;
+        this.isLoading = false;
+      },
+      error: (err) => {
+        this.error = err.message || 'Failed to update status';
+        this.isLoading = false;
+      }
+    });
+  }
+
+  updatePriority(newPriority: 'Low' | 'Medium' | 'High'): void {
+    if (!this.request) return;
+    
+    this.isLoading = true;
+    this.requestService.updateRequest(this.request.id, { priority: newPriority }).subscribe({
+      next: (updatedRequest) => {
+        this.request = updatedRequest;
+        this.isLoading = false;
+      },
+      error: (err) => {
+        this.error = err.message || 'Failed to update priority';
+        this.isLoading = false;
+      }
+    });
   }
 
   assignToCurrentUser(): void {
     if (!this.request || !this.authService.isAdmin()) return;
     
     const user = this.authService.getCurrentUser();
-    this.requestService.updateRequest(this.request.id, { 
-      assignedAgentId: user.id,
-      assignedAgentName: user.username
+    if (!user) return;
+    
+    this.isLoading = true;
+    this.requestService.assignAgent(this.request.id, user.id).subscribe({
+      next: () => {
+        // Update local request
+        this.request = {
+          ...this.request!,
+          assignedAgentId: user.id,
+          assignedAgentName: user.username
+        };
+        this.isLoading = false;
+      },
+      error: (err) => {
+        this.error = err.message || 'Failed to assign request';
+        this.isLoading = false;
+      }
     });
-    this.request = { 
-      ...this.request, 
-      assignedAgentId: user.id,
-      assignedAgentName: user.username
-    };
   }
 
   unassignAgent(): void {
     if (!this.request || !this.authService.isAdmin()) return;
     
-    this.requestService.updateRequest(this.request.id, { 
-      assignedAgentId: undefined,
-      assignedAgentName: undefined
+    this.isLoading = true;
+    this.requestService.assignAgent(this.request.id, null).subscribe({
+      next: () => {
+        // Update local request
+        this.request = {
+          ...this.request!,
+          assignedAgentId: undefined,
+          assignedAgentName: undefined
+        };
+        this.isLoading = false;
+      },
+      error: (err) => {
+        this.error = err.message || 'Failed to unassign agent';
+        this.isLoading = false;
+      }
     });
-    this.request = { 
-      ...this.request, 
-      assignedAgentId: undefined,
-      assignedAgentName: undefined
-    };
   }
 
   addComment(): void {
     if (!this.request || !this.newComment.trim()) return;
     
+    // Note: You'll need to implement comments backend endpoint
+    // For now, update locally
     const user = this.authService.getCurrentUser();
+    if (!user) return;
+    
     const comment = {
       id: Math.random(),
       requestId: this.request.id,
@@ -89,8 +152,11 @@ export class RequestDetailComponent implements OnInit {
     };
     
     const updatedComments = [...(this.request.comments || []), comment];
-    this.requestService.updateRequest(this.request.id, { comments: updatedComments });
-    this.request = { ...this.request, comments: updatedComments };
+    this.request = {
+      ...this.request,
+      comments: updatedComments
+    };
+    
     this.newComment = '';
   }
 
