@@ -14,7 +14,7 @@ db.run("PRAGMA foreign_keys = ON");
 db.run(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL,
+    username TEXT NOT NULL UNIQUE,
     email TEXT NOT NULL,
     password TEXT NOT NULL,
     role TEXT CHECK(role IN ('Agent','Admin')) NOT NULL

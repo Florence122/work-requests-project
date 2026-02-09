@@ -55,17 +55,16 @@ router.post("/login",  (req, res) => {
         return res.status(400).json({ message: "Email and password are required" });
 
         db.get(sql, [email], async (err, user) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (!user) return res.status(401).json({ message: "Invalid credentials" });
+            if (err) return res.status(500).json({ error: err.message });
+            if (!user) return res.status(401).json({ message: "Invalid credentials" });
 
-        const match = await bcrypt.compare(password, user.password);
-        if (!match) return res.status(401).json({ message: "Invalid credentials" });
+            const match = await bcrypt.compare(password, user.password);
+            if (!match) return res.status(401).json({ message: "Invalid credentials" });
 
-        // Create JWT payload
-        const tokenPayload = { id: user.id, role: user.role, username: user.username };
-        const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: "8h" });
+             const tokenPayload = { id: user.id, role: user.role, username: user.username };
+            const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: "8h" });
 
-        res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
+            res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
     });
 });
 
