@@ -12,7 +12,7 @@ import { Request } from '../../models/request';
 @Component({
   selector: 'app-requests-list',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, DatePipe, UserSelectorComponent, RequestCardComponent, RequestFormComponent],
+  imports: [CommonModule, FormsModule, UserSelectorComponent, RequestCardComponent, RequestFormComponent],
   templateUrl: './requests-list.component.html',
   styleUrls: ['./requests-list.component.scss']
 })
