@@ -1,139 +1,122 @@
+const request = require("supertest");
 const express = require("express");
-const db = require("../model/db");
+const usersRouter = require("../routes/users");
+
+jest.mock("../db");
+jest.mock("bcrypt");
+jest.mock("jsonwebtoken");
+jest.mock("../middleware/auth", () => ({
+  requireAdmin: (req, res, next) => next()
+}));
+
+const db = require("../db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const requireAdmin =require('../middlewares/requireAuth')
-require('dotenv').config();
 
-const router = express.Router();
+const app = express();
+app.use(express.json());
+app.use("/users", usersRouter);
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const SALT_ROUNDS = 10;
-
-/**
- * CREATE user/admin
- * POST /users/register
- * Admin-only
- */
-
-router.post("/register", requireAdmin, async (req, res) => {
-    const { username, email, role, password } = req.body;
-
-    if (!username || !email || !role || !password) {
-        return res.status(400).json({ message: "username, email, password and role are required" });
-    }
-
-    try {
-        const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-
-        const sql = `INSERT INTO users (username, email, password, role)
-            VALUES (?, ?, ?, ?)`;
-            
-            db.run(sql, [username, email, hashedPassword, role], function (err) {
-                if (err) {
-                    if (err.message.includes("UNIQUE")) {
-                        return res.status(400).json({ message: "Username or email already exists" });
-                    }
-                return res.status(500).json({ error: err.message });
-                }    
-                res.status(201).json({ id: this.lastID, message: "User registered" });
-            });
-        } catch (error) {
-            res.status(500).json({ error: error.message });
-        }
-});
-
-/**
- * LOGIN user/admin
- * POST /users/login
- * Public
- */
-router.post("/login",  (req, res) => {
-    sql = `SELECT * FROM users WHERE email = ?`;
-    const { email, password } = req.body;
-    if (!email || !password)
-        return res.status(400).json({ message: "Email and password are required" });
-
-        db.get(sql, [email], async (err, user) => {
-            if (err) return res.status(500).json({ error: err.message });
-            if (!user) return res.status(401).json({ message: "Invalid credentials" });
-
-            const match = await bcrypt.compare(password, user.password);
-            if (!match) return res.status(401).json({ message: "Invalid credentials" });
-
-             const tokenPayload = { id: user.id, role: user.role, username: user.username };
-            const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: "8h" });
-
-            res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
-    });
-});
-
-/**
- * GET all users/admins
- * GET /users
- * Admin-only
- */
-router.get("/", requireAdmin,  (req, res) => {
-    const sql = "SELECT id, username, email, role FROM users"; // Never send password hashes
-    db.all(sql, [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
-    });
-});
-
-/**
- * GET single user/admin by ID
- * GET /users/byId/:id
- * Admin-only
- */
-router.get("/byID/:id", requireAdmin, (req, res) => {
-    const sql = "SELECT id, username, email, role FROM users WHERE id = ?";
-    
-    db.get(sql, [req.params.id], (err, row) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (!row) return res.status(404).json({ message: "User not found" });
-        res.json(row);
-    });
-});
-
-/**
- * UPDATE user/admin
- * PUT /users/update/:id
- * Admin-only
- */
-router.put("/update/:id", requireAdmin, async (req, res) => {
-    const { username, email, role } = req.body;
-
-    if (!username || !email || !role) {
-        return res.status(400).json({ message: "username, email and role are required" });
-    }
-
-    try {
-        const sql =  `UPDATE users SET username = ?, email = ?, role = ? WHERE id = ?`;
-        const params = [username, email, role, req.params.id];
+describe("POST /users/register", () => {
+    it("should register a new user", async () => {
+        bcrypt.hash.mockResolvedValue("hashedPassword");
         
-        db.run(sql, params, function (err) {
-            if (err) return res.status(500).json({ error: err.message });
-            if (this.changes === 0) return res.status(404).json({ message: "User not found" });
-            res.json({ message: "User updated successfully" });
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+        db.run.mockImplementation((sql, params, callback) => {
+        callback.call({ lastID: 1 }, null);
+    });
 
-/**
- * DELETE user/admin
- * DELETE /users/:id
- * Admin-only
- */
-router.delete("/delete/:id", (req, res) => {
-    const sql = "DELETE FROM users WHERE id = ?";
-    db.run(sql, [req.params.id], function (err) {
-        if (err) return res.status(500).json({ error: err.message });
-        if (this.changes === 0) return res.status(404).json({ message: "User not found" });
-        res.json({ message: "User deleted successfully" });
+    const res = await request(app)
+    .post("/users/register")
+    .send({
+        username: "admin",
+        email: "admin@test.com",
+        password: "123456",
+        role: "admin"
+    });
+    
+    expect(res.status).toBe(201);
+    expect(res.body.message).toBe("User registered");
+    expect(res.body.id).toBe(1);
+    });
+
+    it("should return 400 if fields are missing", async () => {
+        const res = await request(app)
+        .post("/users/register")
+        .send({ email: "test@test.com" });
+        
+        expect(res.status).toBe(400);
+        expect(res.body.message).toBe(
+            "username, email, password and role are required"
+        );
+    });
+
+    it("should return 400 if fields are missing", async () => {
+        const res = await request(app)
+        .post("/users/register")
+        .send({ email: "test@test.com" });
+        
+        expect(res.status).toBe(400);
+        expect(res.body.message).toBe(
+            "username, email, password and role are required"
+        );
+    });
+    it("should return 400 if username or email exists", async () => {
+        bcrypt.hash.mockResolvedValue("hashedPassword");
+        db.run.mockImplementation((sql, params, callback) => {
+        callback({ message: "UNIQUE constraint failed" });
+    });
+        const res = await request(app)
+        .post("/users/register")
+        .send({
+            username: "admin",
+            email: "admin@test.com",
+            password: "123456",
+            role: "admin"
+        });
+
+        expect(res.status).toBe(400);
+        expect(res.body.message).toBe("Username or email already exists");
+    });
+
+    describe("POST /users/login", () => {
+    it("should login successfully", async () => {
+        db.get.mockImplementation((sql, params, callback) => {
+        callback(null, {
+            id: 1,
+            username: "admin",
+            role: "admin",
+            password: "hashedPassword"
+        });
+    });
+
+        bcrypt.compare.mockResolvedValue(true);
+        jwt.sign.mockReturnValue("fake-jwt-token");
+
+        const res = await request(app)
+        .post("/users/login")
+        .send({
+            email: "admin@test.com",
+            password: "123456"
+        });
+
+        expect(res.status).toBe(200);
+        expect(res.body.token).toBe("fake-jwt-token");
+        expect(res.body.user.username).toBe("admin");
+    });
+
+    describe("GET /users", () => {
+    it("should return all users", async () => {
+        db.all.mockImplementation((sql, params, callback) => {
+        callback(null, [
+            { id: 1, username: "admin", email: "admin@test.com", role: "admin" }
+        ]);
+    });
+    
+    const res = await request(app).get("/users");
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(1);
+    expect(res.body[0].username).toBe("admin");
+    });
+    });
     });
 });
-
-module.exports = router;
