@@ -134,31 +134,6 @@ router.get("/:id",  (req, res) => {
   );
 });
 
-/**
- * UPDATE TASK STATUS (AGENT ONLY)
- * PUT /tasks/:id/status
- */
-router.put("/:id/status",  (req, res) => {
-  const { status } = req.body;
-
-  if (!["open", "in_progress", "done"].includes(status)) {
-    return res.status(400).json({ message: "Invalid status" });
-  }
-
-  const sql = `
-    UPDATE tasks
-    SET status = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ? AND assigned_to = ?
-  `;
-
-  db.run(sql, [status, req.params.id, req.user.id], function (err) {
-    if (err) return res.status(500).json({ error: err.message });
-    if (this.changes === 0) {
-      return res.status(403).json({ message: "Not allowed" });
-    }
-    res.json({ message: "Status updated" });
-  });
-});
 
 /**
  * ASSIGN / UNASSIGN AGENT (ADMIN ONLY)
