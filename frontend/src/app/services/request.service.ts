@@ -7,12 +7,11 @@ import { Request, PRIORITY_ORDER } from '../models/request';
   providedIn: 'root'
 })
 export class RequestService {
-  // Local cache for faster UI updates
   private requestsCache = signal<Request[]>([]);
 
   constructor(private taskService: TaskService) {}
 
-  // Get all requests (with caching)
+  // Get all requests from cache
   getRequests(): Request[] {
     return this.requestsCache();
   }
@@ -35,14 +34,13 @@ export class RequestService {
   loadRequestById(id: number): Observable<Request> {
     return this.taskService.getRequestById(id).pipe(
       tap(request => {
-        // Update cache with the single request
+        // Update cache
         const index = this.requestsCache().findIndex(r => r.id === id);
         if (index !== -1) {
           const updatedCache = [...this.requestsCache()];
           updatedCache[index] = request;
           this.requestsCache.set(updatedCache);
         } else {
-          // Add to cache if not found
           this.requestsCache.update(requests => [...requests, request]);
         }
       })
@@ -53,7 +51,6 @@ export class RequestService {
   createRequest(request: Omit<Request, 'id' | 'createdDate' | 'lastUpdated'>): Observable<Request> {
     return this.taskService.createRequest(request).pipe(
       tap(newRequest => {
-        // Add to cache
         this.requestsCache.update(requests => [...requests, newRequest]);
       })
     );
@@ -63,7 +60,6 @@ export class RequestService {
   updateRequest(id: number, updates: Partial<Request>): Observable<Request> {
     return this.taskService.updateRequest(id, updates).pipe(
       tap(updatedRequest => {
-        // Update cache
         this.requestsCache.update(requests => 
           requests.map(req => req.id === id ? updatedRequest : req)
         );
@@ -71,29 +67,17 @@ export class RequestService {
     );
   }
 
-  // Search requests (returns Observable from backend)
+  // Search requests
   searchRequests(searchTerm: string): Observable<Request[]> {
     return this.taskService.searchRequests(searchTerm);
   }
 
-  // Filter requests (returns Observable from backend)
-  filterRequests(filters: { status?: string; priority?: string; assignedAgent?: string }): Observable<Request[]> {
-    // Convert frontend filters to backend format
-    const backendFilters: any = {};
-    
-    if (filters.status) {
-      backendFilters.status = filters.status;
-    }
-    
-    if (filters.priority) {
-      backendFilters.priority = filters.priority;
-    }
-    
-    // Note: Backend doesn't support assignedAgent filter directly
-    return this.taskService.filterRequests(backendFilters);
+  // Filter requests
+  filterRequests(filters: { status?: string; priority?: string }): Observable<Request[]> {
+    return this.taskService.filterRequests(filters);
   }
 
-  // Sort requests locally (for UI responsiveness)
+  // Sort requests locally
   sortRequests(requests: Request[], sortBy: string, sortDirection: 'asc' | 'desc' = 'asc'): Request[] {
     const sorted = [...requests];
     
@@ -145,17 +129,16 @@ export class RequestService {
     return sorted;
   }
 
-  // Assign/unassign agent
+  // Assign agent
   assignAgent(requestId: number, agentId: number | null): Observable<any> {
     return this.taskService.assignRequest(requestId, agentId).pipe(
       tap(() => {
-        // Update cache
         this.requestsCache.update(requests => 
           requests.map(req => {
             if (req.id === requestId) {
               return {
                 ...req,
-                assignedAgentId: agentId ?? undefined,
+                assignedAgentId: agentId || undefined,
                 assignedAgentName: agentId ? `Agent ${agentId}` : undefined
               };
             }
@@ -166,11 +149,10 @@ export class RequestService {
     );
   }
 
-  // Update status (for agent progress)
+  // Update status
   updateStatus(requestId: number, status: 'In Progress' | 'Done'): Observable<any> {
     return this.taskService.updateRequestStatus(requestId, status).pipe(
       tap(() => {
-        // Update cache
         this.requestsCache.update(requests => 
           requests.map(req => {
             if (req.id === requestId) {
