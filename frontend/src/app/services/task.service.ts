@@ -13,10 +13,10 @@ export class TaskService {
   private requestToTask(request: any): any {
     return {
       title: request.title,
-      description: request.description,
-      priority: request.priority?.toLowerCase(),
+      description: request.description || '',
+      priority: this.mapPriorityToBackend(request.priority),
       status: this.mapStatusToBackend(request.status),
-      assigned_to: request.assignedAgentId
+      assigned_to: request.assignedAgentId || null
     };
   }
 
@@ -30,7 +30,7 @@ export class TaskService {
       status: this.mapStatusFromBackend(task.status),
       createdDate: new Date(task.created_at),
       lastUpdated: new Date(task.updated_at),
-      assignedAgentId: task.assigned_to,
+      assignedAgentId: task.assigned_to || undefined,
       assignedAgentName: task.assigned_agent_name || undefined,
       comments: task.comments || []
     };
@@ -72,7 +72,7 @@ export class TaskService {
     }
   }
 
-  // CREATE REQUEST (mapped to /tasks endpoint)
+  // CREATE REQUEST (POST /tasks)
   createRequest(requestData: any): Observable<Request> {
     const taskData = this.requestToTask(requestData);
     return this.apiService.post<any>('/tasks', taskData).pipe(
@@ -80,25 +80,24 @@ export class TaskService {
     );
   }
 
-  // GET ALL REQUESTS (mapped to /tasks endpoint)
+  // GET ALL REQUESTS (GET /tasks)
   getAllRequests(): Observable<Request[]> {
     return this.apiService.get<any[]>('/tasks').pipe(
       map(tasks => tasks.map(task => this.taskToRequest(task)))
     );
   }
 
-  // GET SINGLE REQUEST (mapped to /tasks/:id)
+  // GET SINGLE REQUEST (GET /tasks/:id)
   getRequestById(id: number): Observable<Request> {
     return this.apiService.get<any>(`/tasks/${id}`).pipe(
       map(task => this.taskToRequest(task))
     );
   }
 
-  // UPDATE REQUEST (mapped to /tasks/:id)
+  // UPDATE REQUEST (PUT /tasks/:id)
   updateRequest(id: number, requestData: any): Observable<Request> {
     const taskData: any = {};
     
-    // Map only the fields that exist in requestData
     if (requestData.title !== undefined) taskData.title = requestData.title;
     if (requestData.description !== undefined) taskData.description = requestData.description;
     if (requestData.priority !== undefined) taskData.priority = this.mapPriorityToBackend(requestData.priority);
@@ -110,14 +109,14 @@ export class TaskService {
     );
   }
 
-  // SEARCH REQUESTS (mapped to /tasks/search)
+  // SEARCH REQUESTS (GET /tasks/search)
   searchRequests(query: string): Observable<Request[]> {
     return this.apiService.get<any[]>(`/tasks/search?q=${query}`).pipe(
       map(tasks => tasks.map(task => this.taskToRequest(task)))
     );
   }
 
-  // FILTER REQUESTS (mapped to /tasks/filter)
+  // FILTER REQUESTS (GET /tasks/filter)
   filterRequests(filters: { status?: string; priority?: string }): Observable<Request[]> {
     const backendFilters: any = {};
     
@@ -134,7 +133,7 @@ export class TaskService {
     );
   }
 
-  // SORT REQUESTS (mapped to /tasks/sort/:field)
+  // SORT REQUESTS (GET /tasks/sort/:field)
   sortRequests(field: string): Observable<Request[]> {
     // Map frontend field names to backend field names
     const backendFieldMap: { [key: string]: string } = {
@@ -151,12 +150,12 @@ export class TaskService {
     );
   }
 
-  // ASSIGN/UNASSIGN AGENT (mapped to /tasks/:id/assign)
+  // ASSIGN/UNASSIGN AGENT (PUT /tasks/:id/assign)
   assignRequest(id: number, agentId: number | null): Observable<any> {
     return this.apiService.put(`/tasks/${id}/assign`, { assigned_to: agentId });
   }
 
-  // UPDATE REQUEST STATUS (mapped to /tasks/:id/progress)
+  // UPDATE REQUEST STATUS (PUT /tasks/:id/progress)
   updateRequestStatus(id: number, status: 'In Progress' | 'Done'): Observable<any> {
     const backendStatus = status === 'In Progress' ? 'in_progress' : 'done';
     return this.apiService.put(`/tasks/${id}/progress`, { status: backendStatus });

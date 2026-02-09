@@ -1,115 +1,132 @@
 import { Injectable, signal } from '@angular/core';
-import { User, MOCK_USERS } from '../models/user';
+import { Router } from '@angular/router';
+import { ApiService } from './api.service';
+import { User } from '../models/user';
 import { LoginRequest, RegisterRequest, AuthResponse } from '../models/auth';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
-  private currentUser = signal<User>(MOCK_USERS[0]); // Default to Admin
-  private isAuthenticated = signal<boolean>(true); // Start as authenticated for demo
+  private currentUser = signal<User | null>(null);
+  private isAuthenticated = signal<boolean>(false);
+  
   currentUserSignal = this.currentUser.asReadonly();
   isAuthenticatedSignal = this.isAuthenticated.asReadonly();
 
-  // Mock users for authentication
-  private mockUsers = [
-    { id: 1, username: 'Admin User', email: 'admin@company.com', role: 'Admin' as const, password: 'admin123' },
-    { id: 2, username: 'Agent Smith', email: 'agent@company.com', role: 'Agent' as const, password: 'agent123' },
-    { id: 3, username: 'John Doe', email: 'john@company.com', role: 'Agent' as const, password: 'john123' }
-  ];
-
-  setCurrentUser(user: User): void {
-    this.currentUser.set(user);
+  constructor(
+    private apiService: ApiService,
+    private router: Router
+  ) {
+    this.initializeAuth();
   }
 
-  getCurrentUser(): User {
-    return this.currentUser();
+  private initializeAuth(): void {
+    const token = this.apiService.getToken();
+    const userData = localStorage.getItem('user');
+    
+    if (token && userData) {
+      try {
+        const user = JSON.parse(userData);
+        this.currentUser.set(user);
+        this.isAuthenticated.set(true);
+      } catch (error) {
+        this.logout();
+      }
+    }
   }
 
-  isAdmin(): boolean {
-    return this.currentUser().role === 'Admin';
-  }
-
-  switchToAdmin(): void {
-    this.currentUser.set(MOCK_USERS[0]);
-  }
-
-  switchToAgent(): void {
-    this.currentUser.set(MOCK_USERS[1]);
-  }
-
-  // Login method
-  login(credentials: LoginRequest): Promise<AuthResponse> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const user = this.mockUsers.find(u => 
-          u.email === credentials.email && u.password === credentials.password
-        );
+  // Login using backend API
+  async login(credentials: LoginRequest): Promise<AuthResponse> {
+    try {
+      const response = await this.apiService.post<any>('/users/login', credentials).toPromise();
+      
+      if (response && response.token) {
+        this.apiService.setToken(response.token);
         
-        if (user) {
-          const { password, ...userWithoutPassword } = user;
-          this.currentUser.set(userWithoutPassword);
-          this.isAuthenticated.set(true);
-          
-          resolve({
-            user: userWithoutPassword,
-            token: 'mock-jwt-token'
-          });
-        } else {
-          reject(new Error('Invalid email or password'));
-        }
-      }, 800); // Simulate API delay
-    });
-  }
-
-  // Register method
-  register(userData: RegisterRequest): Promise<AuthResponse> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        // Check if email already exists
-        const existingUser = this.mockUsers.find(u => u.email === userData.email);
-        
-        if (existingUser) {
-          reject(new Error('Email already registered'));
-          return;
-        }
-
-        // Create new user
-        const newUser = {
-          id: this.mockUsers.length + 1,
-          username: userData.username,
-          email: userData.email,
-          role: userData.role,
-          password: userData.password
+        // Your backend returns: { token, user: { id, username, role } }
+        const user: User = {
+          id: response.user.id,
+          username: response.user.username,
+          email: credentials.email,
+          role: response.user.role === 'Admin' || response.user.role === 'admin' ? 'Admin' : 'Agent'
         };
-
-        this.mockUsers.push(newUser);
         
-        const { password, ...userWithoutPassword } = newUser;
-        this.currentUser.set(userWithoutPassword);
+        localStorage.setItem('user', JSON.stringify(user));
+        this.currentUser.set(user);
         this.isAuthenticated.set(true);
         
-        resolve({
-          user: userWithoutPassword,
-          token: 'mock-jwt-token'
-        });
-      }, 800); // Simulate API delay
-    });
+        return {
+          user: user,
+          token: response.token
+        };
+      }
+      
+      throw new Error('Invalid response from server');
+    } catch (error: any) {
+      throw new Error(error.message || 'Login failed');
+    }
   }
 
-  // Logout method
-  logout(): Promise<void> {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        this.isAuthenticated.set(false);
-        this.currentUser.set(MOCK_USERS[0]); // Reset to default
-        resolve();
-      }, 300);
-    });
+  // Register using backend API
+  async register(userData: RegisterRequest): Promise<AuthResponse> {
+    try {
+      // Note: Your backend register endpoint requires admin authentication
+      // You might need to adjust this or create a public registration endpoint
+      const response = await this.apiService.post<any>('/users/register', userData).toPromise();
+      
+      if (response && response.id) {
+        // After successful registration, automatically login
+        return await this.login({
+          email: userData.email,
+          password: userData.password
+        });
+      }
+      
+      throw new Error('Registration failed');
+    } catch (error: any) {
+      throw new Error(error.message || 'Registration failed');
+    }
+  }
+
+  // Logout
+  async logout(): Promise<void> {
+    this.apiService.removeToken();
+    localStorage.removeItem('user');
+    this.currentUser.set(null);
+    this.isAuthenticated.set(false);
+    this.router.navigate(['/login']);
   }
 
   // Check authentication
   checkAuth(): boolean {
-    return this.isAuthenticated();
+    return this.isAuthenticated() && !!this.apiService.getToken();
+  }
+
+  getCurrentUser(): User | null {
+    return this.currentUser();
+  }
+
+  isAdmin(): boolean {
+    return this.currentUser()?.role === 'Admin';
+  }
+
+  // Demo methods (keep for now, can be removed later)
+  switchToAdmin(): void {
+    const currentUser = this.currentUser();
+    if (currentUser) {
+      const adminUser: User = { ...currentUser, role: 'Admin' };
+      this.currentUser.set(adminUser);
+      localStorage.setItem('user', JSON.stringify(adminUser));
+    }
+  }
+
+  switchToAgent(): void {
+    const currentUser = this.currentUser();
+    if (currentUser) {
+      const agentUser: User = { ...currentUser, role: 'Agent' };
+      this.currentUser.set(agentUser);
+      localStorage.setItem('user', JSON.stringify(agentUser));
+    }
   }
 }

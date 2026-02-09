@@ -17,5 +17,20 @@ export interface AuthResponse {
     email: string;
     role: 'Admin' | 'Agent';
   };
-  token?: string;
+  token: string;
+}
+
+// For backend API responses
+export interface BackendLoginResponse {
+  token: string;
+  user: {
+    id: number;
+    username: string;
+    role: 'Admin' | 'Agent';
+  };
+}
+
+export interface BackendRegisterResponse {
+  id: number;
+  message: string;
 }
